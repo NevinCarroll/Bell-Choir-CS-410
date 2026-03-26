@@ -22,12 +22,26 @@ public class Choir {
     // Mary had a little lamb
     private final List<BellNote> song = new ArrayList<>();
     private Map<Note, Player> players = new HashMap<>();
+    private final AudioFormat audioFormat;
+    private final SourceDataLine sourceDataLine;
 
     /**
      * Set up conductor and audio format
-     * @param af How the audio is to be interpreted and played
+     * @param audioFormat How the audio is to be interpreted and played
      */
-    Choir() {
+    Choir(AudioFormat audioFormat) {
+        this.audioFormat = audioFormat;
+
+
+        SourceDataLine sourceDataLineTemp;
+        try {
+            sourceDataLineTemp = AudioSystem.getSourceDataLine(audioFormat);
+        } catch (LineUnavailableException e) {
+            System.err.println("Error while loading source data line.");
+            sourceDataLineTemp = null;
+        }
+
+        sourceDataLine = sourceDataLineTemp; // TODO, add proper error handling
         createPlayers();
     }
 
@@ -141,7 +155,7 @@ public class Choir {
      */
     void createPlayers() {
         for (Note note : Note.values()) {
-            players.put(note, new Player(note));
+            players.put(note, new Player(note, sourceDataLine));
         }
     }
 
@@ -153,7 +167,15 @@ public class Choir {
         /* TODO While playing, go to the current note that needs to be played, notify that player, have him
         * play that note, wait until done, then play the next note after they are done, do this until all
         * */
+
         Player player = null;
+
+        try {
+            sourceDataLine.open();
+        } catch (LineUnavailableException e) {
+            System.err.println("Error while opening source data line.");
+        }
+
         // Play every note in song
         for (BellNote bn: song) {
             player = players.get(bn.getNote());
@@ -161,13 +183,15 @@ public class Choir {
             player.startThread();
             player.waitToStop();
         }
+
+        sourceDataLine.close();
     }
 
 
 
     public static void main(String[] args) {
         // Set up how notes will be played
-        Choir choir = new Choir();
+        Choir choir = new Choir(new AudioFormat(Note.SAMPLE_RATE, 8, 1, true, false));
         boolean hasError = choir.loadNoteSheet(args[0]); // Load song and check if note sheet is valid
 
         // Play if there were no errors, else print that there was an error

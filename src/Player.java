@@ -14,36 +14,20 @@ public class Player implements Runnable {
     private final SourceDataLine sourceDataLine;
     private volatile Thread playerThread;
 
-    Player(Note note) {
+    Player(Note note, SourceDataLine sourceDataLine) {
         this.note = note;
         noteLength = NoteLength.WHOLE;
         this.audioFormat = new AudioFormat(Note.SAMPLE_RATE, 8, 1, true, false);
 
-        SourceDataLine sourceDataLineTemp;
-        try {
-            sourceDataLineTemp = AudioSystem.getSourceDataLine(audioFormat);
-        } catch (LineUnavailableException e) {
-            System.err.println("Error while loading source data line.");
-            sourceDataLineTemp = null;
-        }
-
-        sourceDataLine = sourceDataLineTemp; // TODO, add proper error handling
+        this.sourceDataLine = sourceDataLine; // TODO, add proper error handling
 
     }
 
     public void run() {
-        try {
-            sourceDataLine.open();
-            sourceDataLine.start();
-
-            playNote();
-
-            sourceDataLine.drain();
-            sourceDataLine.stop();
-            sourceDataLine.close();
-        } catch (LineUnavailableException e) {
-            System.err.println("Error while opening or closing source data line.");
-        }
+        sourceDataLine.start();
+        playNote();
+        sourceDataLine.stop();
+        sourceDataLine.drain();
     }
 
     public void setNoteLength(NoteLength noteLength) {
