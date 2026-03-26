@@ -1,65 +1,68 @@
-public class Player implements Runnable {
-    private static final int NUM_TURNS = 5;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.SourceDataLine;
+import javax.xml.transform.Source;
 
+public class Player implements Runnable {
     BellNote state;
 
-    // TODO Player tells conductor when they are done
+    // TODO Player tells conductor when they are done, but how do you pass note length
 
-    private final Note note;
-    private final Thread t;
-    private volatile boolean running;
-    private boolean myTurn;
-    private int turnCount;
+    private final Note note; // Note player will play
+    private NoteLength noteLength;
+    private final AudioFormat audioFormat;
+    private final SourceDataLine sourceDataLine;
+    private final Thread playerThread;
 
     Player(Note note) {
         this.note = note;
-        turnCount = 1;
-        t = new Thread(this, String.valueOf(note));
-        t.start();
-    }
+        noteLength = NoteLength.WHOLE;
+        this.audioFormat = new AudioFormat(Note.SAMPLE_RATE, 8, 1, true, false);
 
-    public void stopPlayer() {
-        running = false;
-    }
-
-    public void giveTurn() {
-        synchronized (this) {
-            if (myTurn) {
-                throw new IllegalStateException("Attempt to give a turn to a player who's hasn't completed the current turn");
-            }
-            myTurn = true;
-            notify();
-            while (myTurn) {
-                try {
-                    wait();
-                } catch (InterruptedException ignored) {}
-            }
+        SourceDataLine sourceDataLineTemp;
+        try {
+            sourceDataLineTemp = AudioSystem.getSourceDataLine(audioFormat);
+        } catch (LineUnavailableException e) {
+            System.err.println("Error while loading source data line.");
+            sourceDataLineTemp = null;
         }
+
+        sourceDataLine = sourceDataLineTemp; // TODO, add proper error handling
+
+        playerThread = new Thread(this, String.valueOf(note));
     }
 
     public void run() {
-        running = true;
-        synchronized (this) {
-            do {
-                // Wait for my turn
-                while (!myTurn) {
-                    try {
-                        wait();
-                    } catch (InterruptedException ignored) {}
-                }
+        try {
+            sourceDataLine.open();
+            sourceDataLine.start();
 
-                // My turn!
-                doTurn();
-                turnCount++;
+            playNote();
 
-                // Done, complete turn and wakeup the waiting process
-                myTurn = false;
-                notify();
-            } while (running);
+            sourceDataLine.stop();
+            sourceDataLine.close();
+        } catch (LineUnavailableException e) {
+            System.err.println("Error while opening or closing source data line.");
         }
     }
 
-    private void doTurn() {
-        System.out.println("Player[" + note.name() + "] taking turn " + turnCount);
+    public void setNoteLength(NoteLength noteLength) {
+        this.noteLength = noteLength;
+    }
+
+    private void playNote() {
+        final int ms = Math.min(noteLength.timeMs(), Note.MEASURE_LENGTH_SEC * 1000);
+        final int length = Note.SAMPLE_RATE * ms / 1000;
+        sourceDataLine.write(note.sample(), 0, length);
+        sourceDataLine.write(Note.REST.sample(), 0, 50);
+    }
+
+    public void waitToStop() {
+        try {
+            playerThread.join();
+        } catch (InterruptedException ignored) {
+
+        }
     }
 }

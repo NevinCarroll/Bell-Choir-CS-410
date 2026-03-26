@@ -21,19 +21,14 @@ public class Choir {
 
     // Mary had a little lamb
     private final List<BellNote> song = new ArrayList<>();
-
     private Map<Note, Player> players = new HashMap<>();
-
-    private final Conductor conductor; // TODO might remove
-    private final AudioFormat af;
 
     /**
      * Set up conductor and audio format
      * @param af How the audio is to be interpreted and played
      */
-    Choir(AudioFormat af) {
-        this.conductor = new Conductor();
-        this.af = af;
+    Choir() {
+        createPlayers();
     }
 
 
@@ -142,13 +137,11 @@ public class Choir {
 
     /**
      * TODO Finish
-     * Create a player corresponding to each note in the song
+     * Create a player corresponding to each note
      */
     void createPlayers() {
-        final int songNotes = 8;
-
         for (Note note : Note.values()) {
-//            players.put();
+            players.put(note, new Player(note));
         }
     }
 
@@ -157,21 +150,16 @@ public class Choir {
      * Play song that was read from the text file
      */
     void playSong() {
-
         /* TODO While playing, go to the current note that needs to be played, notify that player, have him
         * play that note, wait until done, then play the next note after they are done, do this until all
         * */
-        try (final SourceDataLine line = AudioSystem.getSourceDataLine(af)) {
-            line.open();
-            line.start();
-
-            // Play every note in song
-            for (BellNote bn: song) {
-                playNote(line, bn);
-            }
-            line.drain();
-        } catch (LineUnavailableException e) {
-            System.err.println("Error while playing song");
+        Player player = null;
+        // Play every note in song
+        for (BellNote bn: song) {
+            player = players.get(bn.getNote());
+            player.setNoteLength(bn.getNoteLength());
+            player.run();
+            player.waitToStop();
         }
     }
 
@@ -180,24 +168,16 @@ public class Choir {
      * @param line Writes audio to output
      * @param bn Note and length to be played
      */
-    private void playNote(SourceDataLine line, BellNote bn) {
-        final int ms = Math.min(bn.length.timeMs(), Note.MEASURE_LENGTH_SEC * 1000);
-        final int length = Note.SAMPLE_RATE * ms / 1000;
-        line.write(bn.note.sample(), 0, length);
-        line.write(Note.REST.sample(), 0, 50);
-    }
-
-    /**
-     * Get notes in songs, to only create players that are for the song
-     */
-    private void getNotesInSong() {
-
-    }
+//    private void playNote(SourceDataLine line, BellNote bn) {
+//        final int ms = Math.min(bn.length.timeMs(), Note.MEASURE_LENGTH_SEC * 1000);
+//        final int length = Note.SAMPLE_RATE * ms / 1000;
+//        line.write(bn.note.sample(), 0, length);
+//        line.write(Note.REST.sample(), 0, 50);
+//    }
 
     public static void main(String[] args) {
         // Set up how notes will be played
-        final AudioFormat af = new AudioFormat(Note.SAMPLE_RATE, 8, 1, true, false);
-        Choir choir = new Choir(af);
+        Choir choir = new Choir();
         boolean hasError = choir.loadNoteSheet(args[0]); // Load song and check if note sheet is valid
 
         // Play if there were no errors, else print that there was an error
