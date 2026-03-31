@@ -1,3 +1,5 @@
+import com.sun.source.doctree.SystemPropertyTree;
+
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -29,7 +31,7 @@ public class Choir {
     private final List<BellNote> song = new ArrayList<>();
 
     /** Mapping of each Note to its corresponding Player. */
-    private Map<Note, Player> players = new HashMap<>();
+    private final Map<Note, Player> players = new HashMap<>();
 
     /** Shared audio output line used by all players. */
     private final SourceDataLine sourceDataLine;
@@ -49,7 +51,12 @@ public class Choir {
         }
 
         // Assign initialized audio line (may be null if initialization failed)
-        sourceDataLine = sourceDataLineTemp; // TODO: add proper error handling
+        sourceDataLine = sourceDataLineTemp;
+
+        if (sourceDataLine == null) {
+            System.err.println("Error while loading source data line.");
+            return;
+        }
 
         // Initialize players for each note
         createPlayers();
@@ -105,7 +112,7 @@ public class Choir {
             // Validate format (must contain exactly 2 parts)
             if (parts.length != 2) {
                 System.err.println("Invalid format at line " + lineNum +
-                        ". Expected: NOTE LENGTH");
+                        ". Expected: NOTE LENGTH (EX: A4 2). Ensure there is only one space between note and length.");
                 hasError = true;
                 continue;
             }
@@ -118,7 +125,7 @@ public class Choir {
                 noteLengthValue = Integer.parseInt(parts[1]);
             } catch (NumberFormatException e) {
                 System.err.println("Invalid note length at line " + lineNum +
-                        ". Must be an integer.");
+                        ". Must be an integer: " + parts[1]);
                 hasError = true;
                 continue;
             }
@@ -128,7 +135,7 @@ public class Choir {
             try {
                 note = Note.valueOf(noteString);
             } catch (IllegalArgumentException e) {
-                System.err.println("Invalid note at line " + lineNum);
+                System.err.println("Invalid note at line " + lineNum + ": " + noteString);
                 hasError = true;
                 continue;
             }
