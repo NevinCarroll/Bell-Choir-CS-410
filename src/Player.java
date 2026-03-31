@@ -1,24 +1,37 @@
 import javax.sound.sampled.SourceDataLine;
 
 public class Player implements Runnable {
-    BellNote state;
-
     private final Note note; // Note player will play
     private volatile NoteLength noteLength;
 
     private final SourceDataLine sourceDataLine;
-    private volatile Thread playerThread;
+    private final Thread playerThread;
 
     private volatile boolean myTurn;
+    private volatile boolean running;
 
     Player(Note note, SourceDataLine sourceDataLine) {
         this.note = note;
         noteLength = NoteLength.WHOLE;
         this.sourceDataLine = sourceDataLine;
+        playerThread = new Thread(this);
     }
 
     public void run() {
-        playNote();
+        while (running) {
+            synchronized (this) {
+                if (myTurn) {
+                    playNote();
+                    myTurn = false;
+                    notify();
+                } else {
+                    try {
+                        wait();
+                    } catch (InterruptedException ignored) {
+                    }
+                }
+            }
+        }
     }
 
     public void setNoteLength(NoteLength noteLength) {
@@ -26,8 +39,12 @@ public class Player implements Runnable {
     }
 
     public void startThread() {
-        playerThread = new Thread(this); // Create new thread, because threads can't be run more than once
+        running = true;
         playerThread.start();
+    }
+
+    public void stopThread() {
+        running = false;
     }
 
     /**
@@ -40,11 +57,19 @@ public class Player implements Runnable {
         sourceDataLine.write(Note.REST.sample(), 0, 50);
     }
 
-    public void waitToStop() {
+    public synchronized void waitToStop() {
         try {
-            playerThread.join();
+            wait();
         } catch (InterruptedException ignored) {
-
         }
+    }
+
+    public synchronized void giveTurn() {
+        myTurn = true;
+        notify();
+    }
+
+    public synchronized void notifyPlayer() {
+        notify();
     }
 }

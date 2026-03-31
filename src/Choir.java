@@ -22,17 +22,14 @@ public class Choir {
     // Mary had a little lamb
     private final List<BellNote> song = new ArrayList<>();
     private Map<Note, Player> players = new HashMap<>();
-    private final AudioFormat audioFormat;
     private final SourceDataLine sourceDataLine;
 
     /**
      * Set up conductor and audio format
+     *
      * @param audioFormat How the audio is to be interpreted and played
      */
     Choir(AudioFormat audioFormat) {
-        this.audioFormat = audioFormat;
-
-
         SourceDataLine sourceDataLineTemp;
         try {
             sourceDataLineTemp = AudioSystem.getSourceDataLine(audioFormat);
@@ -47,6 +44,7 @@ public class Choir {
 
     /**
      * Reads the given file and stores the notes and note lengths into the song list, that will be played later.
+     *
      * @param filename Name of file to be read
      * @return Whether an errors occurred when reading note sheet
      */
@@ -151,9 +149,15 @@ public class Choir {
     /**
      * Create a player corresponding to each note
      */
-    void createPlayers() {
+    private void createPlayers() {
         for (Note note : Note.values()) {
             players.put(note, new Player(note, sourceDataLine));
+        }
+    }
+
+    private void startPlayers() {
+        for (Note note : Note.values()) {
+            players.get(note).startThread();
         }
     }
 
@@ -161,7 +165,6 @@ public class Choir {
      * Play song that was read from the text file
      */
     void playSong() {
-
         try {
             sourceDataLine.open();
         } catch (LineUnavailableException e) {
@@ -169,13 +172,21 @@ public class Choir {
         }
         sourceDataLine.start();
 
+        startPlayers();
+
         Player player = null;
         // Play every note in song
-        for (BellNote bn: song) {
+        for (BellNote bn : song) {
             player = players.get(bn.getNote());
             player.setNoteLength(bn.getNoteLength());
-            player.startThread();
+            player.giveTurn();
             player.waitToStop();
+        }
+
+        for (Note note : Note.values()) {
+            player = players.get(note);
+            player.stopThread();
+            player.notifyPlayer();
         }
 
         sourceDataLine.drain();
