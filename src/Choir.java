@@ -13,21 +13,31 @@ import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.SourceDataLine;
 
 /**
- * A conductor will play a song given by a note sheet. For each note, the conductor will point to the player than needs
- * player there note, they will play there note, then the conductor will go on to the next player until the song is
- * finished.
+ * The {@code Choir} class acts as a conductor for a group of {@link Player} objects.
+ * <p>
+ * It reads a note sheet from a file, assigns each note to the appropriate player,
+ * and coordinates playback of the song in sequence.
+ * </p>
+ * <p>
+ * Each {@link Player} is responsible for playing a specific {@link Note}, while the
+ * {@code Choir} controls timing and ordering.
+ * </p>
  */
 public class Choir {
 
-    // Mary had a little lamb
+    /** Sequence of notes that make up the song. */
     private final List<BellNote> song = new ArrayList<>();
+
+    /** Mapping of each Note to its corresponding Player. */
     private Map<Note, Player> players = new HashMap<>();
+
+    /** Shared audio output line used by all players. */
     private final SourceDataLine sourceDataLine;
 
     /**
-     * Set up conductor and audio format
+     * Constructs a {@code Choir} with the given audio format.
      *
-     * @param audioFormat How the audio is to be interpreted and played
+     * @param audioFormat the format used for audio playback
      */
     Choir(AudioFormat audioFormat) {
         SourceDataLine sourceDataLineTemp;
@@ -38,87 +48,94 @@ public class Choir {
             sourceDataLineTemp = null;
         }
 
-        sourceDataLine = sourceDataLineTemp; // TODO, add proper error handling
+        // Assign initialized audio line (may be null if initialization failed)
+        sourceDataLine = sourceDataLineTemp; // TODO: add proper error handling
+
+        // Initialize players for each note
         createPlayers();
     }
 
     /**
-     * Reads the given file and stores the notes and note lengths into the song list, that will be played later.
+     * Reads a note sheet file and loads its contents into the {@code song} list.
+     * <p>
+     * Each line of the file must contain:
+     * <pre>
+     * NOTE LENGTH
+     * </pre>
+     * Example:
+     * <pre>
+     * C4 4
+     * D4 8
+     * </pre>
      *
-     * @param filename Name of file to be read
-     * @return Whether an errors occurred when reading note sheet
+     * @param filename the path to the note sheet file
+     * @return {@code true} if any errors occurred while reading or parsing the file;
+     *         {@code false} otherwise
      */
     private boolean loadNoteSheet(String filename) {
-        // Read file into memory
+
         BufferedReader noteReader = null;
+
+        // Attempt to open the file
         try {
             noteReader = new BufferedReader(new FileReader(filename));
         } catch (FileNotFoundException e) {
             System.out.println("File not found: " + filename);
-            return false;
+            return true;
         }
 
-        String line; // Line to read
-        int lineNum = 0; // Index to locate line errors
-        boolean hasError = false; // Store every line with an error
+        String line;
+        int lineNum = 0;
+        boolean hasError = false;
 
-        // Run while there are no more lines to read
+        // Read file line-by-line
         while (true) {
             lineNum++;
             try {
-                if ((line = noteReader.readLine()) == null) break; // Break out of loop when at final line
+                if ((line = noteReader.readLine()) == null) break;
             } catch (IOException e) {
-                System.err.println("Error reading note: " + lineNum); // I/O error reading line
-                hasError = true;  // State that there was an error while reading
+                System.err.println("Error reading note at line: " + lineNum);
+                hasError = true;
                 continue;
             }
 
-            String[] parts = line.trim().split(" "); // Split line into multiple parts
+            // Split line into components
+            String[] parts = line.trim().split(" ");
 
-            // If line is not in two parts, then it is invalid
+            // Validate format (must contain exactly 2 parts)
             if (parts.length != 2) {
-                System.err.println("Invalid amount of parts at line " + lineNum + ". Need to be two parts separated by one space.");
+                System.err.println("Invalid format at line " + lineNum +
+                        ". Expected: NOTE LENGTH");
                 hasError = true;
                 continue;
             }
 
-            // Temp variables to hold parts of the string
             String noteString = parts[0];
-            int noteLengthString = 0;
+            int noteLengthValue;
 
-            // Parse second part of line to see if it is an integer, if not, then line has error
+            // Parse note length
             try {
-                noteLengthString = Integer.parseInt(parts[1]);
+                noteLengthValue = Integer.parseInt(parts[1]);
             } catch (NumberFormatException e) {
-                System.err.println("Invalid note length at line " + lineNum + ". Need to be an integer");
+                System.err.println("Invalid note length at line " + lineNum +
+                        ". Must be an integer.");
                 hasError = true;
                 continue;
             }
 
-            // Note of line
-            Note note = null;
-
-            // Try to get note value from enum
-            // Enum.valueOf() TODO
-            for (Note n : Note.values()) {
-                if (n.name().equals(noteString)) {
-                    note = n;
-                    break;
-                }
-            }
-
-            // If note is not a note value in the enum, then the line has error
-            if (note == null) {
-                System.err.println("Invalid note at line " + lineNum + ": " + noteString);
+            // Parse note enum
+            Note note;
+            try {
+                note = Note.valueOf(noteString);
+            } catch (IllegalArgumentException e) {
+                System.err.println("Invalid note at line " + lineNum);
                 hasError = true;
                 continue;
             }
 
-            // Note length
+            // Convert integer to NoteLength enum
             NoteLength noteLength;
-
-            // Convert int into NoteLength value, it no value exists, then line has error
-            switch (noteLengthString) {
+            switch (noteLengthValue) {
                 case 1:
                     noteLength = NoteLength.WHOLE;
                     break;
@@ -132,22 +149,21 @@ public class Choir {
                     noteLength = NoteLength.EIGHTH;
                     break;
                 default:
-                    System.err.println("Invalid note length at line " + lineNum + ": " + noteLengthString);
+                    System.err.println("Invalid note length at line " + lineNum +
+                            ": " + noteLengthValue);
                     hasError = true;
                     continue;
             }
 
-            // Make new bell note if everything has gone fine and add it into song
-            BellNote newNote = new BellNote(note, noteLength);
-            song.add(newNote);
+            // Add validated note to song
+            song.add(new BellNote(note, noteLength));
         }
 
-        // Return stating whether there was an error
         return hasError;
     }
 
     /**
-     * Create a player corresponding to each note
+     * Initializes a {@link Player} for each available {@link Note}.
      */
     private void createPlayers() {
         for (Note note : Note.values()) {
@@ -155,6 +171,9 @@ public class Choir {
         }
     }
 
+    /**
+     * Starts all player threads.
+     */
     private void startPlayers() {
         for (Note note : Note.values()) {
             players.get(note).startThread();
@@ -162,7 +181,11 @@ public class Choir {
     }
 
     /**
-     * Play song that was read from the text file
+     * Plays the loaded song by coordinating all players.
+     * <p>
+     * Each note is handed to the appropriate player, which plays it
+     * before the conductor proceeds to the next note.
+     * </p>
      */
     void playSong() {
         try {
@@ -170,12 +193,15 @@ public class Choir {
         } catch (LineUnavailableException e) {
             System.err.println("Error while opening source data line.");
         }
+
         sourceDataLine.start();
 
+        // Start all players
         startPlayers();
 
-        Player player = null;
-        // Play every note in song
+        Player player;
+
+        // Play each note sequentially
         for (BellNote bn : song) {
             player = players.get(bn.getNote());
             player.setNoteLength(bn.getNoteLength());
@@ -183,21 +209,31 @@ public class Choir {
             player.waitToStop();
         }
 
+        // Stop all players
         for (Note note : Note.values()) {
             player = players.get(note);
             player.stopThread();
             player.notifyPlayer();
         }
 
+        // Ensure all audio data is played
         sourceDataLine.drain();
     }
 
+    /**
+     * Entry point for running the Choir program.
+     *
+     * @param args command-line arguments (expects a single argument: note sheet file path)
+     */
     public static void main(String[] args) {
-        // Set up how notes will be played
-        Choir choir = new Choir(new AudioFormat(Note.SAMPLE_RATE, 8, 1, true, false));
-        boolean hasError = choir.loadNoteSheet(args[0]); // Load song and check if note sheet is valid
 
-        // Play if there were no errors, else print that there was an error
+        // Initialize choir with audio format
+        Choir choir = new Choir(new AudioFormat(Note.SAMPLE_RATE, 8, 1, true, false));
+
+        // Load note sheet
+        boolean hasError = choir.loadNoteSheet(args[0]);
+
+        // Play song if no errors occurred
         if (hasError) {
             System.err.println("Error loading note sheet: " + args[0]);
         } else {
