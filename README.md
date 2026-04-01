@@ -102,29 +102,4 @@ change the note sheet file path by typing:
 ant run -Dsong=""
 ```
 
-then placing the file path to the file between the quotes (EX: path/to/file.txt). 
-
-
-## Educational Purpose
-
-This project was developed for CS 410 and is intended to demonstrate:
-
-* Practical use of threads in Java
-* Synchronization patterns (wait/notify)
-* Real-time system coordination
-
-## Future Improvements
-
-* GUI for visualizing the choir
-* Support for loading songs from files
-* Improved timing accuracy using advanced scheduling
-* Dynamic number of players
-
-## Author
-
-Nevin Carroll
-GitHub: https://github.com/NevinCarroll
-
-## License
-
-This project is for educational use. Add a license if you plan to distribute or reuse.
+then placing the file path to the file between the quotes (EX: -Dsong="path/to/file.txt").
