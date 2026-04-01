@@ -108,7 +108,7 @@ public class Player implements Runnable {
     }
 
     /**
-     * Causes the calling thread (typically the conductor) to wait until
+     * Causes the calling thread to wait until
      * this player has finished playing its note.
      */
     public synchronized void waitToStop() {
@@ -122,6 +122,11 @@ public class Player implements Runnable {
      * Signals this player that it is their turn to play.
      */
     public synchronized void giveTurn() {
+        if (myTurn) {
+            System.err.println("Already player's turn.");
+            return;
+        }
+
         myTurn = true;
         notify();
     }
